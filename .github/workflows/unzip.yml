@@ -1,0 +1,46 @@
+name: Unzip & Deploy
+
+on:
+  push:
+    paths:
+      - '*.zip'  # যেকোনো zip push করলেই trigger হবে
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Find and unzip
+        run: |
+          ZIP=$(ls *.zip 2>/dev/null | head -1)
+          if [ -z "$ZIP" ]; then
+            echo "No zip file found!"
+            exit 1
+          fi
+          echo "Found: $ZIP"
+          unzip -o "$ZIP" -d extracted/
+          
+          # Extracted folder এর ভেতর থেকে files বের করো
+          INNER=$(ls extracted/ | head -1)
+          if [ -d "extracted/$INNER" ]; then
+            cp -r extracted/$INNER/. .
+          else
+            cp -r extracted/. .
+          fi
+          
+          # Zip ফাইল আর extracted folder মুছে ফেলো
+          rm -f "$ZIP"
+          rm -rf extracted/
+
+      - name: Commit & Push files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Auto: unzipped and deployed $(date +'%Y-%m-%d %H:%M')"
+          git push
